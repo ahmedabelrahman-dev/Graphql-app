@@ -1,9 +1,15 @@
 // backend/index.js
 import { ApolloServer } from '@apollo/server';
 import { startStandaloneServer } from '@apollo/server/standalone';
+import dotenv from 'dotenv';
+
+//
+import { connectDB } from './db/connectDB.js';
 
 import mergedResolvers from './resolvers/index.js';
 import mergedTypeDefs from './typeDefs/index.js';
+
+dotenv.config();
 
 // Optional: replace buildContext function if you had auth logic
 const buildContext = async ({ req }) => {
@@ -25,5 +31,5 @@ const { url } = await startStandaloneServer(server, {
     credentials: true,
   },
 });
-
+await connectDB();
 console.log(`🚀 Server ready at ${url}`);
