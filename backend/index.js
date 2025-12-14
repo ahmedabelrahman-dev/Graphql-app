@@ -1,51 +1,49 @@
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
 import passport from 'passport';
 import session from 'express-session';
-import connectMongo from 'connect-mongodb-session';
+import MongoStore from 'connect-mongo';
 
 import { ApolloServer } from '@apollo/server';
-import { startStandaloneServer } from '@apollo/server/standalone';
+import { expressMiddleware } from '@as-integrations/express5';
+import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 
 import { buildContext } from 'graphql-passport';
 
 import mergedResolvers from './resolvers/index.js';
 import mergedTypeDefs from './typeDefs/index.js';
-
 import { connectDB } from './db/connectDB.js';
 import { configurePassport } from './passport/passport.config.js';
 
 dotenv.config();
 configurePassport();
-
-await connectDB(); // connect to MongoDB
+await connectDB();
 
 const app = express();
+const httpServer = http.createServer(app);
 
-// --- Session store ---
-const MongoDBStore = connectMongo(session);
-const store = new MongoDBStore({
-  uri: process.env.MONGO_URI,
-  collection: 'sessions',
-});
-store.on('error', (err) => console.log(err));
-
+// --- Express session with MongoStore ---
 app.use(
   session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 1000 * 60 * 60 * 24 * 7, httpOnly: true },
-    store: store,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGO_URI,
+      collectionName: 'sessions',
+    }),
+    cookie: { httpOnly: true, maxAge: 1000 * 60 * 60 * 24 * 7 },
   })
 );
 
+// --- Passport ---
 app.use(passport.initialize());
 app.use(passport.session());
 
-// --- Optional: CORS for REST routes ---
+// --- CORS ---
 app.use(
   cors({
     origin: 'http://localhost:3000',
@@ -53,25 +51,31 @@ app.use(
   })
 );
 
-// Example REST route
+// --- REST route ---
 app.get('/api/hello', (req, res) => res.json({ message: 'Hello from REST!' }));
 
-// --- Apollo Server v5 ---
+// --- Apollo Server ---
 const server = new ApolloServer({
   typeDefs: mergedTypeDefs,
   resolvers: mergedResolvers,
+  plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
 });
 
-// Attach Apollo Server to Express app via startStandaloneServer
-const { url } = await startStandaloneServer(server, {
-  listen: { port: 4000 },
-  context: async ({ req, res }) => buildContext({ req, res }),
-  app, // attach to Express
-  path: '/graphql',
-  cors: {
+await server.start();
+
+// --- Apollo middleware ---
+app.use(
+  '/graphql',
+  cors({
     origin: 'http://localhost:3000',
     credentials: true,
-  },
-});
+  }),
+  express.json(),
+  expressMiddleware(server, {
+    context: async ({ req, res }) => buildContext({ req, res }),
+  })
+);
 
-console.log(`🚀 Server ready at ${url}`);
+// --- Start server ---
+await new Promise((resolve) => httpServer.listen({ port: 4000 }, resolve));
+console.log('🚀 Server ready at http://localhost:4000/graphql');
