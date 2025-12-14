@@ -1,11 +1,25 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import InputField from '../components/InputField';
+import { useMutation } from '@apollo/client/react';
+import { LOGIN } from '../graphql/mutations/user.mutation';
+import toast from 'react-hot-toast';
+import { GET_AUTHENTICATED_USER } from '../graphql/queries/user.query';
+import { useNavigate } from 'react-router-dom';
 
 const LoginPage = () => {
   const [loginData, setLoginData] = useState({
     username: '',
     password: '',
+  });
+  const navigate = useNavigate();
+
+  const [login, { loading }] = useMutation(LOGIN, {
+    refetchQueries: [{ query: GET_AUTHENTICATED_USER }],
+    awaitRefetchQueries: true,
+    onCompleted: () => {
+      navigate('/'); // navigate to home immediately
+    },
   });
 
   const handleChange = (e) => {
@@ -16,9 +30,16 @@ const LoginPage = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log(loginData);
+    if (!loginData.username || !loginData.password)
+      return toast.error('Please fill in all fields');
+    try {
+      await login({ variables: { input: loginData } });
+    } catch (error) {
+      console.error('Error logging in:', error);
+      toast.error(error.message);
+    }
   };
 
   return (
@@ -52,11 +73,11 @@ const LoginPage = () => {
               <div>
                 <button
                   type="submit"
-                  className="w-full bg-black text-white p-2 rounded-md hover:bg-gray-800 focus:outline-none focus:bg-black  focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors duration-300
-										disabled:opacity-50 disabled:cursor-not-allowed
+                  className="w-full bg-black text-white p-2 rounded-md hover:bg-gray-800 focus:outline-none focus:bg-black  focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed
 									"
+                  disabled={loading}
                 >
-                  Login
+                  {loading ? 'Loading...' : 'Login'}
                 </button>
               </div>
             </form>
