@@ -6,7 +6,7 @@ import { MdLogout } from 'react-icons/md';
 import toast from 'react-hot-toast';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { LOGOUT } from '../graphql/mutations/user.mutation';
-// import { GET_TRANSACTION_STATISTICS } from '../graphql/queries/transaction.query';
+import { GET_TRANSACTION_STATISTICS } from '../graphql/queries/transaction.query';
 import { GET_AUTHENTICATED_USER } from '../graphql/queries/user.query';
 // import { useEffect, useState } from 'react';
 
@@ -73,7 +73,7 @@ const HomePage = () => {
               onClick={handleLogout}
             />
           )}
-          {/* loading spinner */}
+          loading spinner
           {loading && (
             <div className="w-6 h-6 border-t-2 border-b-2 mx-2 rounded-full animate-spin"></div>
           )}
